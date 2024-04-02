@@ -1,0 +1,1408 @@
+---
+title: "Full TCGA dataframe with missing values"
+output: html_notebook
+---
+
+## Purpose of the script
+
+Data collection of the proteomic expression data and other features that
+may be of interest of 28 cancer types.
+
+**Input data sets:** Follow the [[Downloading the data from the GDC
+website]] instructions for the following cancer studies
+
+-   TCGA-GBM (Glioblastoma multiforme)
+
+-   TCGA-LGG (Brain Lower Grade Glioma)
+
+-   TCGA-HNSC (Head and Neck squamous cell carcinoma)
+
+-   TCGA-THCA (Thyroid carcinoma)
+
+-   TCGA-ESCA (Esophageal carcinoma)
+
+-   TCGA-SARC (Sarcoma)
+
+-   TCGA-SKCM (Skin Cutaneous Melanoma)
+
+-   TCGA-LUAD (Lung adenocarcinoma)
+
+-   TCGA-LUSC (Lung squamous cell carcinoma)
+
+-   TCGA-MESO (Mesothelioma)
+
+-   TCGA-THYM (Thymoma)
+
+-   TCGA-BRCA (Breast invasive carcinoma)
+
+-   TCGA-STAD (Stomach adenocarcinoma)
+
+-   TCGA-LIHC (Liver hepatocellular carcinoma)
+
+-   TCGA-PAAD (Pancreatic adenocarcinoma)
+
+-   TCGA-ACC - Adrenocortical carcinoma)
+
+-   TCGA-PCPG (Pheochromocytoma and Paraganglioma)
+
+-   TCGA-KIRC (Kidney renal clear cell carcinoma)
+
+-   TCGA-KICH (Kidney Chromophobe)
+
+-   TCGA-KIRP (Kidney renal papillary cell carcinoma)
+
+-   TCGA-COAD (Colon adenocarcinoma)
+
+-   TCGA-READ (Rectum adenocarcinoma)
+
+-   TCGA-OVCA(OV, Ovarian serous cystadenocarcinoma)
+
+-   TCGA-UCEC (Uterine Corpus Endometrial Carcinoma)
+
+-   TCGA-CESC (Cervical squamous cell carcinoma and endocervical
+    adenocarcinoma)
+
+-   TCGA-PRAD (Prostate adenocarcinoma)
+
+-   TCGA-TGCT (Testicular Germ Cell Tumors)
+
+-   TCGA-BLCA (Bladder Urothelial Carcinoma)
+
+**Output of script:** One large csv data set containing all the
+proteomic data of all patients of all cancer types. Additional clinical
+patient data is included in case of further analysis. Proteins which
+contain more than 50% of data values missing are removed.
+
+### Downloading the data from the GDC website
+
+Path to get to the data on the <https://portal.gdc.cancer.gov/> website:
+
+-   Click on tab 'Projects'
+
+-   Set the following filters - Program=TCGA, Data Category=proteome
+    profiling
+
+-   Click on the relevant TCGA-\_\_\_\_ project in the list
+
+-   Click Explore Project Data
+
+-   Click view files in repository
+
+-   Set the following filters - Program=TCGA, Data Category=proteome
+    profiling
+
+-   Click 'Add all files to cart'
+
+-   Go to cart
+
+-   Download the files into the following folders
+
+    -   Cart into the Biospecimen folder
+
+    -   Clinical into the relevant Clinical folder
+
+    -   Sample data into into the relevant sample_sheet folder
+
+    -   Metadata into the relevant metadata folder
+
+**NOTE:** When you download the cart and start putting them all in the
+Biospecimen combined folder your system will ask if you would like to
+replace the 'MANIFEST.txt' file just press 'skip this file' as it will
+not be used in scripts.
+
+**NOTE:** Download the Clinical file as a TSV not JSON.
+
+## The script
+
+### Organising the data into the appropriate folders
+
+Making a list of the file paths of all the patients
+
+```{r}
+
+
+list_of_files <-
+  list.files(
+    path = "../Data/Raw_TCGA/Biospecimen",
+    recursive = TRUE,
+    pattern = "\\.tsv$",
+    full.names = TRUE
+  )
+
+```
+
+Obtaining the peptide names list
+
+```{r}
+
+peptide_list <- list()
+
+for (i in list_of_files) {
+  p <- read.table(file = i,
+                  sep = '\t',
+                  header = TRUE)
+  for (n in 1:nrow(p)) {
+    if (p[n, "peptide_target"] %in% peptide_list == FALSE) {
+      peptide_list <- append(peptide_list, p$peptide_target)
+    }
+    else {
+    }
+  }
+  
+}
+
+```
+
+**NOTE:** To ensure that the protein list is the same for all patients
+in this combined cancer type data set. This peptide list will be used as
+the column headers.
+
+Combining the clinical, and sample sheet data of the different cancer
+types
+
+```{r}
+#Lung cancer - TCGA-LUAD study
+setwd("../Data/Raw_TCGA/LUAD/Clinical")
+
+clinical_data_LUAD <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+
+exposure_data_LUAD <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/LUAD/Sample_sheet/")
+
+sample_sheet_LUAD <-
+  read.delim(file = "gdc_sample_sheet.2023-12-11.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+#Lung cancer - TCGA-LUSC study 
+setwd("../Data/Raw_TCGA/LUSC/Clinical")
+
+clinical_data_LUSC <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+
+exposure_data_LUSC <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/LUSC/Sample_sheet/")
+
+sample_sheet_LUSC <-
+  read.delim(file = "gdc_sample_sheet.2024-01-17.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+#Liver cancer 
+setwd("../Data/Raw_TCGA/LIHC/Clinical")
+
+clinical_data_LIHC <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_LIHC <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/LIHC/Sample_sheet/")
+
+sample_sheet_LIHC <-
+  read.delim(file = "gdc_sample_sheet.2023-12-14.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+#Breast cancer - TCGA-BRCA 
+setwd("../Data/Raw_TCGA/BRCA/Clinical")
+
+clinical_data_BRCA <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_BRCA <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/BRCA/Sample_sheet/")
+
+sample_sheet_BRCA <-
+  read.delim(file = "gdc_sample_sheet.2024-01-01.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Colon adenocarcinoma - TCGA-COAD 
+setwd("../Data/Raw_TCGA/COAD/Clinical")
+
+clinical_data_COAD <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_COAD <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/COAD/Sample_sheet/")
+
+sample_sheet_COAD <-
+  read.delim(file = "gdc_sample_sheet.2024-01-19.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Rectum adenocarcinoma - TCGA-READ
+setwd("../Data/Raw_TCGA/READ/Clinical")
+
+clinical_data_READ <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_READ <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/READ/Sample_sheet/")
+
+sample_sheet_READ <-
+  read.delim(file = "gdc_sample_sheet.2024-01-19.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Kidney renal clear cell carcinoma - TCGA-KIRC 
+setwd("../Data/Raw_TCGA/KIRC/Clinical")
+
+clinical_data_KIRC <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_KIRC <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/KIRC/Sample_sheet/")
+
+sample_sheet_KIRC <-
+  read.delim(file = "gdc_sample_sheet.2024-01-19.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Ovarian serous cystadenocarcinoma - TCGA-OV (OVCA)
+setwd("../Data/Raw_TCGA/OVCA/Clinical")
+
+clinical_data_OVCA <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_OVCA <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/OVCA/Sample_sheet/")
+
+sample_sheet_OVCA <-
+  read.delim(file = "gdc_sample_sheet.2024-01-19.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Uterine Corpus Endometrial Carcinoma - TCGA-UCEC
+setwd("../Data/Raw_TCGA/UCEC/Clinical")
+
+clinical_data_UCEC <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_UCEC <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/UCEC/Sample_sheet/")
+
+sample_sheet_UCEC <-
+  read.delim(file = "gdc_sample_sheet.2024-01-19.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Head and Neck squamous cell carcinoma - TCGA-HNSC 
+setwd("../Data/Raw_TCGA/HNSC/Clinical")
+
+clinical_data_HNSC <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_HNSC <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/HNSC/Sample_sheet/")
+
+sample_sheet_HNSC <-
+  read.delim(file = "gdc_sample_sheet.2024-01-19.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Bladder Urothelial Carcinoma - TCGA-BLCA
+setwd("../Data/Raw_TCGA/BLCA/Clinical")
+
+clinical_data_BLCA <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_BLCA <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/BLCA/Sample_sheet/")
+
+sample_sheet_BLCA <-
+  read.delim(file = "gdc_sample_sheet.2024-01-19.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Glioblastoma multiforme - TCGA-GBM
+setwd("../Data/Raw_TCGA/GBM/Clinical")
+
+clinical_data_GBM <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_GBM <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/GBM/Sample_sheet/")
+
+sample_sheet_GBM <-
+  read.delim(file = "gdc_sample_sheet.2024-01-19.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Adrenocortical carcinoma - TCGA-ACC
+setwd("../Data/Raw_TCGA/ACC/Clinical")
+
+clinical_data_ACC <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_ACC <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/ACC/Sample_sheet/")
+
+sample_sheet_ACC <-
+  read.delim(file = "gdc_sample_sheet.2024-01-26.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Brain Lower Grade Glioma - TCGA-LGG
+setwd("../Data/Raw_TCGA/LGG/Clinical")
+
+clinical_data_LGG <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_LGG <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/LGG/Sample_sheet/")
+
+sample_sheet_LGG <-
+  read.delim(file = "gdc_sample_sheet.2024-01-26.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Cervical squamous cell carcinoma and endocervical adenocarcinoma - TCGA-CESC
+setwd("../Data/Raw_TCGA/CESC/Clinical")
+
+clinical_data_CESC <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_CESC <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/CESC/Sample_sheet/")
+
+sample_sheet_CESC <-
+  read.delim(file = "gdc_sample_sheet.2024-01-26.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Esophageal carcinoma - TCGA-ESCA
+setwd("../Data/Raw_TCGA/ESCA/Clinical")
+
+clinical_data_ESCA <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_ESCA <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/ESCA/Sample_sheet/")
+
+sample_sheet_ESCA <-
+  read.delim(file = "gdc_sample_sheet.2024-01-26.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Kidney Chromophobe - TCGA-KICH
+setwd("../Data/Raw_TCGA/KICH/Clinical")
+
+clinical_data_KICH <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_KICH <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/KICH/Sample_sheet/")
+
+sample_sheet_KICH <-
+  read.delim(file = "gdc_sample_sheet.2024-01-26.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Kidney renal papillary cell carcinoma - TCGA-KIRP
+setwd("../Data/Raw_TCGA/KIRP/Clinical")
+
+clinical_data_KIRP <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_KIRP <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/KIRP/Sample_sheet/")
+
+sample_sheet_KIRP <-
+  read.delim(file = "gdc_sample_sheet.2024-01-26.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Mesothelioma - TCGA-MESO
+setwd("../Data/Raw_TCGA/MESO/Clinical")
+
+clinical_data_MESO <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_MESO <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/MESO/Sample_sheet/")
+
+sample_sheet_MESO <-
+  read.delim(file = "gdc_sample_sheet.2024-01-26.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Pancreatic adenocarcinoma - TCGA-PAAD
+setwd("../Data/Raw_TCGA/PAAD/Clinical")
+
+clinical_data_PAAD <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_PAAD <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/PAAD/Sample_sheet/")
+
+sample_sheet_PAAD <-
+  read.delim(file = "gdc_sample_sheet.2024-01-26.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Pheochromocytoma and Paraganglioma - TCGA-PCPG
+setwd("../Data/Raw_TCGA/PCPG/Clinical")
+
+clinical_data_PCPG <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_PCPG <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/PCPG/Sample_sheet/")
+
+sample_sheet_PCPG <-
+  read.delim(file = "gdc_sample_sheet.2024-01-26.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Prostate adenocarcinoma - TCGA-PRAD
+setwd("../Data/Raw_TCGA/PRAD/Clinical")
+
+clinical_data_PRAD <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_PRAD <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/PRAD/Sample_sheet/")
+
+sample_sheet_PRAD <-
+  read.delim(file = "gdc_sample_sheet.2024-01-26.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Sarcoma - TCGA-SARC
+setwd("../Data/Raw_TCGA/SARC/Clinical")
+
+clinical_data_SARC <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_SARC <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/SARC/Sample_sheet/")
+
+sample_sheet_SARC <-
+  read.delim(file = "gdc_sample_sheet.2024-01-26.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Skin Cutaneous Melanoma - TCGA-SKCM
+setwd("../Data/Raw_TCGA/SKCM/Clinical")
+
+clinical_data_SKCM <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_SKCM <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/SKCM/Sample_sheet/")
+
+sample_sheet_SKCM <-
+  read.delim(file = "gdc_sample_sheet.2024-01-26.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Stomach adenocarcinoma - TCGA-STAD
+setwd("../Data/Raw_TCGA/STAD/Clinical")
+
+clinical_data_STAD <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_STAD <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/STAD/Sample_sheet/")
+
+sample_sheet_STAD <-
+  read.delim(file = "gdc_sample_sheet.2024-01-26.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Testicular Germ Cell Tumors - TCGA-TGCT
+setwd("../Data/Raw_TCGA/TGCT/Clinical")
+
+clinical_data_TGCT <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_TGCT <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/TGCT/Sample_sheet/")
+
+sample_sheet_TGCT <-
+  read.delim(file = "gdc_sample_sheet.2024-01-26.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Thymoma - TCGA-THYM
+setwd("../Data/Raw_TCGA/THYM/Clinical")
+
+clinical_data_THYM <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_THYM <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/THYM/Sample_sheet/")
+
+sample_sheet_THYM <-
+  read.delim(file = "gdc_sample_sheet.2024-01-26.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+```{r}
+# Thyroid carcinoma - TCGA-THCA
+setwd("../Data/Raw_TCGA/THCA/Clinical")
+
+clinical_data_THCA <-
+  read.delim(file = "clinical.tsv", sep = '\t', header = TRUE)
+exposure_data_THCA <-
+  read.delim(file = "exposure.tsv", sep = '\t', header = TRUE)
+
+
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+```{r}
+
+setwd("../Data/Raw_TCGA/THCA/Sample_sheet/")
+
+sample_sheet_THCA <-
+  read.delim(file = "gdc_sample_sheet.2024-01-26.tsv", sep = '\t', header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+**NOTE:** For most studies follow_up, family_history, and pathology
+datasets are empty, so I did not read them in.
+
+Combining the data sets before exporting as a combined data set
+
+```{r}
+# Combining data sets
+clinical_data <-
+  rbind(clinical_data_LUSC,
+        clinical_data_LUAD,
+        clinical_data_LIHC,
+        clinical_data_BRCA,
+        clinical_data_COAD,
+        clinical_data_READ,
+        clinical_data_KIRC,
+        clinical_data_OVCA,
+        clinical_data_UCEC, 
+        clinical_data_HNSC,
+        clinical_data_BLCA,
+        clinical_data_GBM,
+        clinical_data_ACC,
+        clinical_data_LGG,
+        clinical_data_CESC,
+        clinical_data_ESCA,
+        clinical_data_KICH,
+        clinical_data_KIRP,
+        clinical_data_MESO,
+        clinical_data_PAAD,
+        clinical_data_PCPG,
+        clinical_data_PRAD,
+        clinical_data_SARC,
+        clinical_data_SKCM,
+        clinical_data_STAD,
+        clinical_data_TGCT,
+        clinical_data_THYM,
+        clinical_data_THCA)
+exposure_data <-
+  rbind(exposure_data_LUSC,
+        exposure_data_LUAD,
+        exposure_data_LIHC,
+        exposure_data_BRCA,
+        exposure_data_COAD,
+        exposure_data_READ,
+        exposure_data_KIRC,
+        exposure_data_OVCA,
+        exposure_data_UCEC,
+        exposure_data_HNSC,
+        exposure_data_BLCA,
+        exposure_data_GBM,
+        exposure_data_ACC,
+        exposure_data_LGG,
+        exposure_data_CESC,
+        exposure_data_ESCA,
+        exposure_data_KICH,
+        exposure_data_KIRP,
+        exposure_data_MESO,
+        exposure_data_PAAD,
+        exposure_data_PCPG,
+        exposure_data_PRAD,
+        exposure_data_SARC,
+        exposure_data_SKCM,
+        exposure_data_STAD,
+        exposure_data_TGCT,
+        exposure_data_THYM,
+        exposure_data_THCA)
+sample_sheet <-
+  rbind(sample_sheet_LUSC,
+        sample_sheet_LUAD,
+        sample_sheet_LIHC,
+        sample_sheet_BRCA,
+        sample_sheet_COAD,
+        sample_sheet_READ,
+        sample_sheet_KIRC,
+        sample_sheet_OVCA,
+        sample_sheet_UCEC,
+        sample_sheet_HNSC,
+        sample_sheet_BLCA,
+        sample_sheet_GBM,
+        sample_sheet_ACC,
+        sample_sheet_LGG,
+        sample_sheet_CESC,
+        sample_sheet_ESCA,
+        sample_sheet_KICH,
+        sample_sheet_KIRP,
+        sample_sheet_MESO,
+        sample_sheet_PAAD,
+        sample_sheet_PCPG,
+        sample_sheet_PRAD,
+        sample_sheet_SARC,
+        sample_sheet_SKCM,
+        sample_sheet_STAD,
+        sample_sheet_TGCT,
+        sample_sheet_THYM,
+        sample_sheet_THCA)
+
+```
+
+Exporting the data frame as csv files into a global folder that will
+contain the clinical, exposure, and sample sheet used for making the
+combined cancer data set.
+
+```{r}
+write.csv(clinical_data,
+          "../Data/Raw_TCGA/Clinical/clinical_data.csv",
+          row.names = TRUE)
+write.csv(exposure_data,
+          "../Data/Raw_TCGA/Clinical/exposure_data.csv",
+          row.names = TRUE)
+write.csv(sample_sheet,
+          "../Data/Raw_TCGA/Sample_sheet/sample_sheet.csv",
+          row.names = TRUE)
+
+```
+
+### Creating a combined cancer dataset which contains protein expression and additional patient information which is of interest for the current study
+
+Getting the clinical data
+
+```{r}
+
+
+setwd("../Data/Raw_TCGA/Clinical")
+
+clinical_data <-
+  read.csv(file = "clinical_data.csv", header = TRUE)
+exposure_data <-
+  read.csv(file = "exposure_data.csv", header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the clinical data.
+
+Getting sample sheet
+
+```{r}
+
+setwd("../Data/Raw_TCGA/Sample_sheet")
+sample_sheet <-
+  read.csv(file = "sample_sheet.csv", header = TRUE)
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to
+the folder which has the sample sheet data.
+
+Making the global dataframe of patient identifiers (File.Names, File.ID,
+case.submitter.id), and peptide expression
+
+```{r}
+
+# File name contains the File names of patients of all cancer types
+File.Name <- basename(list_of_files)
+
+
+#File.ID <- dirname(list_of_files)
+#File.ID <- gsub("../Data/Raw_TCGA/Biospecimen/", "", File.ID)
+
+
+# File name is found in the sample sheet data set, which also contains 'case.submitted.ID' (it is called the 'Case.ID' in the sample sheet) which found in the protein, clinical, and exposure data sets. 
+case.submitter.id <- c()
+
+for (i in File.Name) {
+  if (i %in% sample_sheet$File.Name == TRUE) {
+    r <-
+      row.names(sample_sheet[which(sample_sheet == i, arr.ind = T)[, 1],])
+    
+    case.submitter.id <-
+      append(case.submitter.id, sample_sheet$Case.ID[as.numeric(r)])
+    
+    
+  }
+  else{
+    case.submitter.id <- append(case.submitter.id, "NA")
+  }
+}
+
+
+#Obtaining the relevant clinical data 
+
+stage <- c()
+
+for (i in case.submitter.id) {
+  if (i %in% clinical_data$case_submitter_id == TRUE) {
+    r <-
+      row.names(clinical_data[which(clinical_data == i, arr.ind = T)[, 1],])
+    
+    stage <- append(stage, suppressWarnings(clinical_data$ajcc_pathologic_stage[as.numeric(r[1])]))
+    
+  } else{
+    stage <- append(stage, "NA")
+  }
+}
+
+
+age <- c()
+
+for (i in case.submitter.id) {
+  if (i %in% clinical_data$case_submitter_id == TRUE) {
+    r <-
+      row.names(clinical_data[which(clinical_data == i, arr.ind = T)[, 1],])
+    
+    age <- append(age, suppressWarnings(as.numeric(clinical_data$age_at_index[as.numeric(r[1])])))
+    
+  } else{
+    age <- append(age, "NA")
+  }
+}
+
+days_to_death <- c()
+
+for (i in case.submitter.id) {
+  if (i %in% clinical_data$case_submitter_id == TRUE) {
+    r <-
+      row.names(clinical_data[which(clinical_data == i, arr.ind = T)[, 1],])
+    
+    days_to_death <- append(days_to_death, suppressWarnings(as.numeric(clinical_data$days_to_death[as.numeric(r[1])])))
+    
+  } else{
+    days_to_death <- append(days_to_death, "NA")
+  }
+}
+
+site_of_biopsy<- c()
+
+for (i in case.submitter.id) {
+  if (i %in% clinical_data$case_submitter_id == TRUE) {
+    r <-
+      row.names(clinical_data[which(clinical_data == i, arr.ind = T)[, 1],])
+    
+    site_of_biopsy <- append(site_of_biopsy, suppressWarnings(clinical_data$site_of_resection_or_biopsy[as.numeric(r[1])]))
+    
+  } else{
+    site_of_biopsy <- append(site_of_biopsy, "NA")
+  }
+}
+
+primary_diagnosis<- c()
+
+for (i in case.submitter.id) {
+  if (i %in% clinical_data$case_submitter_id == TRUE) {
+    r <-
+      row.names(clinical_data[which(clinical_data == i, arr.ind = T)[, 1],])
+    
+    primary_diagnosis <- append(primary_diagnosis, suppressWarnings(clinical_data$primary_diagnosis[as.numeric(r[1])]))
+    
+  } else{
+    primary_diagnosis <- append(primary_diagnosis, "NA")
+  }
+}
+
+
+project_id <- c()
+
+for (i in case.submitter.id) {
+  if (i %in% clinical_data$case_submitter_id == TRUE) {
+    r <-
+      row.names(clinical_data[which(clinical_data == i, arr.ind = T)[, 1],])
+    
+    project_id <- append(project_id, suppressWarnings(clinical_data$project_id[as.numeric(r[1])]))
+    
+  } else{
+    project_id <- append(project_id, "NA")
+  }
+}
+
+
+#Obtaining the relevant exposure data 
+
+cigarettes_per_day <- c()
+
+for (i in case.submitter.id) {
+  if (i %in% exposure_data$case_submitter_id == TRUE) {
+    r <-
+      row.names(exposure_data[which(exposure_data == i, arr.ind = T)[, 1],])
+    
+    cigarettes_per_day <-
+      append(cigarettes_per_day, suppressWarnings(as.numeric(exposure_data$cigarettes_per_day[as.numeric(r)])))
+    
+  } else{
+    cigarettes_per_day <- append(cigarettes_per_day, "NA")
+  }
+}
+
+years_smoked <- c()
+
+for (i in case.submitter.id) {
+  if (i %in% exposure_data$case_submitter_id == TRUE) {
+    r <-
+      row.names(exposure_data[which(exposure_data == i, arr.ind = T)[, 1],])
+    
+    years_smoked <-
+      append(years_smoked, suppressWarnings(as.numeric(exposure_data$years_smoked[as.numeric(r)])))
+    
+  } else{
+    years_smoked <- append(years_smoked, "NA")
+  } 
+}
+
+
+
+
+# Making the dataframe
+protein_data <-
+  data.frame(
+    case.submitter.id,
+    project_id,
+    age,
+    primary_diagnosis,
+    stage,
+    site_of_biopsy,
+    cigarettes_per_day,
+    years_smoked,
+    days_to_death,
+    c(peptide_list)
+  )
+
+```
+
+```{r}
+
+# Creating a function which removes the full stop that was added to the end columns names to ensure that the protein names in this empty data frame I just created is the same as those found in the patients protein expression data sheets.
+
+
+# Remove the first two characters from selected columns
+cols_to_modify <- c(-1, -2, -3, -4, -5,-6,-7,-8, -9)
+colnames(protein_data)[cols_to_modify] <- sub("^.{2}", "", colnames(protein_data)[cols_to_modify])
+
+                                                                  
+
+
+#removing the '.' at the end of the protein names
+has_full_stop <- function(input_string) {
+  # Use substr to extract the last character of the string
+  last_character <-
+    substr(input_string, nchar(input_string), nchar(input_string))
+  
+  # Check if the last character is a full stop
+  return(last_character == ".")
+}
+
+library(stringr)
+for (i in colnames(protein_data)) {
+  if (has_full_stop(i) == TRUE) {
+    #colnames(protein_data)<-str_sub(i,end = -2)
+    colnames(protein_data)[which(colnames(protein_data) == i)] <-
+      str_sub(colnames(protein_data)[which(colnames(protein_data) == i)], end = -2)
+    
+  }
+  
+}
+
+rownames(protein_data) <- paste(File.Name)
+
+```
+
+**Warning suppression explanation:** when there is no value to pull out
+there is a warning message "NAs introduced by coercion", this is want I
+want to happen if there is no value to pull out so I suppressed this
+warning. Then if there is anything other (e.g. '--') the else statement
+puts a NA.
+
+**NOTE:** At this point the data frame will contain the necessary number
+of rows and columns. The additional patient information (e.g. age,
+primary diagnosis etc.) columns will have values in them for each
+patient. However, the protein expression data will not. Instead there is
+just the protein name, this will be overwritten in the next code block
+with the patients protein expression data.
+
+**NOTE:** The next code block will take a longer time to process due
+large amount of patients and due to the program having to look into each
+of the patients 'Biospecimen' file to pull out all the necessary
+information (it took me 1.45 hrs).
+
+Filling in the protein expression data
+
+```{r}
+
+col_names_protein <- colnames(protein_data)
+col_names_protein <- col_names_protein[c(-1, -2, -3, -4, -5,-6,-7,-8, -9)]
+
+c <- c()
+for (y in c(peptide_list)) {
+  c <- c()
+  y <- which(peptide_list == y)
+  for (i in list_of_files) {
+    n <- read.table(file = i,
+                    sep = '\t',
+                    header = TRUE)
+    
+    x <-
+      row.names(n[which(n$peptide_target == peptide_list[y], arr.ind = T),])
+    #the condition is saying if the data has the protein or not
+    if (length(x) != 0) {
+      if (is.na(n$protein_expression[as.numeric(x)]) == FALSE) {
+        c <- append(c, n$protein_expression[as.numeric(x)])
+      } else{
+        c <- append(c, "NA")
+      }
+      
+    } else{
+      c <- append(c, "NA")
+    }
+  }
+  y_index <-
+    which(colnames(protein_data) == col_names_protein[y], arr.ind = T)
+  protein_data[, y_index] <- c
+  
+  
+}
+
+
+```
+
+### Removing proteins which have more that 50% of patients without data
+
+Counting the number of NAs for each protein
+
+```{r}
+
+na_count <- c()
+for (i in col_names_protein) {
+  na_count <- append(na_count, (sum(protein_data[,i]=='NA') / 4581) * 100)
+  
+}
+
+proteins_out <- c()
+proteins_adjs <- c()
+
+for (i in 1:length(na_count)) {
+  if ((na_count[i] > 50) == TRUE) {
+    proteins_out <- append(proteins_out, col_names_protein[i])
+  }
+  if ((na_count[i] < 50) == TRUE) {
+    proteins_adjs <- append(proteins_adjs, col_names_protein[i])
+    
+  }
+}
+
+```
+
+Removing the proteins from the data which have more than 50% of sample
+values missing
+
+```{r}
+ 
+protein_data<-protein_data[,!(names(protein_data) %in% proteins_out)]
+
+
+```
+
+### Exporting the Full TCGA data which contains missing data values as a csv
+
+Exporting the dataframe to a csv file
+
+```{r}
+
+write.csv(protein_data,
+          "../Data/Processed_Data/Full_TCGA_data_missing_values.csv",
+          row.names = TRUE)
+
+```
