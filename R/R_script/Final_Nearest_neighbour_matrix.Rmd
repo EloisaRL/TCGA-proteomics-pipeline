@@ -1,0 +1,249 @@
+---
+title: "Nearest neighbour matrix"
+output: html_notebook
+---
+
+## Purpose of script
+
+**Input datasets:** - Protein to gene conversion excel sheet - shows what genes are associated to the shortlisted proteins - Unique gene excel sheet - gene list for which will be used to search on StringDB to find gene interactions
+
+**Output datasets:** - Gene to gene interaction matrix - 0 is assigned to interaction with itself, 1 is assigned to direct interaction with another gene (i.e., interactions with strong evidence found through StringDB), 2 is assigned to indirect interaction with another gene (i.e., they share an interaction with another gene), 100 is assigned to no interaction (i.e., doesn't meet the previous criteria) - Protein to protein interaction matrix - 0 is assigned to interaction with itself, 1 is assigned to proteins which have all genes in common with another protein, 2 is assigned to proteins which have a genes that have a direct interaction (i.e., these genes have a 1 in the gene to gene matrix), 100 is assigned to no interaction (i.e., doesn't meet the previous criteria)
+
+## Creating the gene to gene matrix
+
+```{r}
+# Loading the stringDB library
+library(STRINGdb)
+```
+
+```{r}
+# Loading the lastest version of stringDB
+# Species is set to human 
+# Score threshold is set to 700 so that only interactions with strong evidence are included in the library
+stringDB <- STRINGdb$new(version="12", species=9606, score_threshold=700, network_type="full", input_directory="")
+
+```
+
+```{r}
+setwd("../Data/Processed_Data")
+
+gene_list <-
+  read.csv(file = "Shortlisted_unique_gene_list.csv", header = TRUE)
+gene_list = gene_list[-1]
+
+```
+
+**Warning explanation:** Changing the working directory of this chunk to the folder which has the unique gene list.
+
+```{r}
+mapped <- stringDB$map(gene_list, "X0", removeUnmappedRows = FALSE)
+```
+
+**Warning explanation:** String recognized all genes provided
+
+```{r}
+# Obtaining all gene interactions
+hit <- mapped$STRING_id
+interactions <- stringDB$get_interactions(hit)
+```
+
+```{r}
+# Ensuring that the score threshold is 700 or higher which represent interactions with strong evidence
+interactions <- interactions[interactions$combined_score>=700,]
+
+```
+
+Below I am creating the gene to gene matrix, following the criteria defined in [Purpose of script]
+
+```{r}
+near_neighbours <- matrix(NA, nrow = length(gene_list$X0), ncol = length(gene_list$X0))
+row.names(near_neighbours) <- gene_list$X0
+colnames(near_neighbours) <- gene_list$X0
+
+```
+
+```{r}
+#i = 0
+for (i in (mapped$X0)){
+  string_id <- mapped$STRING_id[as.numeric(row.names(mapped[which(mapped==i,arr.ind=T)[,1],] ))]
+  x <- which(interactions$from == string_id)
+  for (y1 in x) {
+    interactions$from[y1]<- i
+    
+  }
+  z <- which(interactions$to == string_id)
+  for (y2 in z) {
+    interactions$to[y2]<- i
+    
+  }
+}
+
+  
+```
+
+```{r}
+near_neighbours <- matrix(NA, nrow = length(gene_list$X0), ncol = length(gene_list$X0))
+row.names(near_neighbours) <- gene_list$X0
+colnames(near_neighbours) <- gene_list$X0
+
+```
+
+```{r}
+for (i in gene_list$X0) {
+  scores <- c()
+  n <- c()
+  n <- append(n, which(interactions$from==i))
+  n <- append(n, which(interactions$to==i))
+  for (r in row.names(near_neighbours)) {
+    if (any(interactions$from[n]==r)|any(interactions$to[n]==r)==TRUE){
+      scores<- append(scores, 1)
+    }else{
+      scores<- append(scores, 100)
+    }
+  }
+  col_index <- which(colnames(near_neighbours) == i, arr.ind = T)
+  near_neighbours[, col_index] <- scores
+  
+  }
+
+diag(near_neighbours)<-0
+
+```
+
+```{r}
+
+for (y in colnames(near_neighbours)) {
+  for (x in row.names(near_neighbours)) {
+    for (z in row.names(near_neighbours)) {
+      if (near_neighbours[x,y]==1 & near_neighbours[z,x]==1 & near_neighbours[z,y]==100){
+        near_neighbours[z,y]=2
+        
+      }
+      
+    }
+    
+  }
+  
+}
+
+```
+
+```{r}
+# Saving this gene to gene matrix
+
+write.csv(near_neighbours,
+          "../Data/Processed_Data/Near_neighbours_matrix_genes.csv",
+          row.names = TRUE)
+```
+
+## Creating a protein to protein matrix
+
+```{r}
+setwd("../Data/Processed_Data")
+
+conversion <-
+  read.csv(file = "Protein_to_gene_conversion.csv", header = TRUE)
+conversion = conversion[-1]
+conversion[is.na(conversion)] <- ""
+```
+
+**Warning explanation:** Changing the working directory of this chunk to the folder which has the protein to gene conversion.
+
+```{r}
+# Creating an empty matrix
+
+protein_neighbours <- matrix(NA, nrow = length(conversion$Protein.Name), ncol = length(conversion$Protein.Name))
+row.names(protein_neighbours) <- conversion$Protein.Name
+colnames(protein_neighbours) <- conversion$Protein.Name
+
+```
+
+```{r}
+# Function to be used below in filling the matrix
+
+count_empty_cells <- function(row) {
+  sum(row == "")
+}
+```
+
+Below I am creating the protein to protein matrix, following the criteria defined in [Purpose of script]
+
+```{r}
+for (y in colnames(protein_neighbours)) {
+  x <- row.names(conversion[which(conversion$Protein.Name == y, arr.ind = T),])
+  for (y1 in rownames(protein_neighbours)) {
+    x1 <- row.names(conversion[which(conversion$Protein.Name == y1, arr.ind = T),])
+    distance = c()
+    pos = c()
+    count = 0
+    count1 = 0
+    for (c in colnames(conversion)[-1]) {
+      if(conversion[x,c] != ""){
+        count1 = count1 +1
+        count2 = 0
+        col_gene = conversion[x,c]
+        for (c1 in colnames(conversion)[-1]) {
+          if(conversion[x1,c1] != ""){
+            gene_to_test = conversion[x1,c1]
+            count2 = count2 +1
+            count = length(distance) + 1
+            pos = append(pos, count)
+            if(near_neighbours[col_gene, gene_to_test]==0 & length(pos) != 1){
+              distance = append(distance, near_neighbours[col_gene, gene_to_test])
+              pos = head(pos, -1)
+              distance = distance[-pos]
+              pos = c()
+              break
+              
+            } else{
+              distance = append(distance, near_neighbours[col_gene, gene_to_test])
+            }
+          }
+          
+        }
+      }
+      should = 6 - sum(apply(conversion[x,], 1, count_empty_cells))
+      should1 = 6 - sum(apply(conversion[x1,], 1, count_empty_cells))      
+    if(any(distance==0) & should != should1){
+        distance = append(distance, 100)
+      }
+      
+    }
+    
+    if(length(distance)==1 & distance[1] == 0 | all(distance==0)){
+          protein_neighbours[y1,y]=0
+        } else if(any(distance==0)){
+          protein_neighbours[y1,y]=1
+        } else if(any(distance==1)){
+          protein_neighbours[y1,y]=2
+        } else{
+          protein_neighbours[y1,y]=100
+        }
+    
+  }
+  
+}
+
+
+```
+
+```{r}
+# Checking that the protein interaction matrix was filled in properly
+
+find_non_symmetric <- function(mat) {
+  non_symmetric_coords <- which(mat != t(mat), arr.ind = TRUE)
+  return(non_symmetric_coords)
+  
+}
+
+find_non_symmetric(protein_neighbours)
+```
+
+```{r}
+# Saving the protein interaction matrix
+
+write.csv(protein_neighbours,
+          "../Data/Processed_Data/Near_neighbours_matrix_proteins.csv",
+          row.names = TRUE)
+
+```
